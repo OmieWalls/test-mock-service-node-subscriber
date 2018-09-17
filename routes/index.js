@@ -12,8 +12,6 @@ router.get('/', function(req, res, next) {
     // Your Google Cloud Platform project ID
     const projectId = 'test-mock-service';
 
-
-
 // Initiating a client
     const pubsub = new PubSub({
         projectId: projectId,
@@ -25,9 +23,6 @@ router.get('/', function(req, res, next) {
         projectId: projectId,
     });
 
-    /**
-     * TODO(developer): Uncomment the following lines to run the sample.
-     */
 const subscriptionName = 'projects/test-mock-service/subscriptions/Node-Subscriber';
 const timeout = 60;
 
@@ -44,13 +39,15 @@ const timeout = 60;
         //TODO: Store data
         const data = message.data.toString('UTF8');
         const json = JSON.parse(data);
-// The kind for the new entity
+
+//      The kind for the new entity
         const kind = 'Test';
-// The name/ID for the new entity
-        const name = json.Name;
-// The Cloud Datastore key for the new entity
+//      The name/ID for the new entity
+        const name = json.Company_ID;
+//      The Cloud Datastore key for the new entity
         const usCompaniesKey = datastore.key([kind, name]);
 
+//      Prepares the new entity
         const usCompaniesData = {
             Action: json.Action,
             City: json.City,
@@ -64,7 +61,6 @@ const timeout = 60;
             State: json.State
         };
 
-// Prepares the new entity
         const usCompanies = {
             key: usCompaniesKey,
             data: usCompaniesData,
