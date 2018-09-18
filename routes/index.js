@@ -41,36 +41,22 @@ const timeout = 60;
         const json = JSON.parse(data);
 
 //      The kind for the new entity
-        const kind = 'Test';
+        const kind = req.params['schema'];
 //      The name/ID for the new entity
-        const name = json.Company_ID;
+        const name = json[req.params['name']];
 //      The Cloud Datastore key for the new entity
-        const usCompaniesKey = datastore.key([kind, name]);
+        const taskKey = datastore.key([kind, name]);
 
-//      Prepares the new entity
-        const usCompaniesData = {
-            Action: json.Action,
-            City: json.City,
-            Company_ID: json.Company_ID,
-            Country: json.Country,
-            Created_On: json.Created_On,
-            Description: json.Description,
-            Is_Active: json.Is_Active,
-            Name: json.Name,
-            Slogan: json.Slogan,
-            State: json.State
-        };
-
-        const usCompanies = {
-            key: usCompaniesKey,
-            data: usCompaniesData,
+        const task = {
+            key: taskKey,
+            data: json,
         };
 
 // Saves the entity
         datastore
-            .upsert(usCompanies)
+            .upsert(task)
             .then(() => {
-                console.log(`Saved ${usCompanies.key.name}: ${usCompanies.data}`);
+                console.log(`Saved ${task.key.name}: ${task.data}`);
             })
             .catch(err => {
                 console.error('ERROR:', err);
