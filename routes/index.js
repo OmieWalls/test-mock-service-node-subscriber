@@ -3,7 +3,6 @@ const router = express.Router();
 
 // Initializes global variables
 let topic, subscriber, kind, entity, projectId, is_upsert,      // Query Parameters
-    existingTopic, existingSubscriber,                          // Pub/Sub Flags
     pubsub, datastore, subscription, timeout;                   // Client-Related Variables
 
 //  Imports the Google Cloud client library
@@ -26,10 +25,6 @@ router.get('/', function(req, res, next) {
     entity = req.query['entity'];
     is_upsert = req.query['is_upsert'];
 
-//  Declare flags
-    existingSubscriber = false;
-    existingTopic = false;
-
 //  Initiating a Pub/Sub client
     pubsub = new PubSub({
         projectId: projectId,
@@ -41,14 +36,14 @@ router.get('/', function(req, res, next) {
         projectId: projectId,
     });
 
-//  Checks for existing topics and subscriptions and creates them if they are missing.
+//  Creates topic if there is no existing topic. If there is, proceed to check subscriptions
     checkTopics();
 
 //  Create an event handler to handle messages
     let messageCount = 0;
 
     const messageHandler = message => {
-        logMessage();
+        logMessage(message);
 
 //      Decode the message ByteString and parse into an JSON object
         const data = message.data.toString('utf8');
@@ -65,10 +60,13 @@ router.get('/', function(req, res, next) {
 
 //      Handles upsert or insert based upon indication
         is_upsert ? upsert(task) : insert(task);
+
+//      Acknowledge receipt of the message
+        message.ack();
     };
 
 //  Logs incoming messages
-    function logMessage() {
+    function logMessage(message) {
         console.log(`Received message ${message.id}:`);
         console.log(`\tData: ${message.data.toString('utf8')}`);
         console.log(`\tAttributes: ${JSON.stringify(message.attributes)}`);
@@ -77,31 +75,29 @@ router.get('/', function(req, res, next) {
 
 // Checks topics for the topic given
     function checkTopics() {
+        let existingTopic = false;
         pubsub
             .getTopics()
             .then(results => {
                 const topics = results[0];
 
                 topics.forEach(resultTopic => {
-//              If topic exists then the flag is set to true
+                    // If topic exists then set flag to true
                     if (resultTopic.name.indexOf(topic) > -1) {
                         existingTopic = true;
                     }
                 });
-//              Creates topic if there is no existing topic. If there is, proceed to check subscriptions
-                if (!existingTopic) {
-                    createTopic();
-                } else {
-                    checkSubscriptions();
-                }
+                // Checks subscriptions if topic exists or creates a new one
+                existingTopic ? checkSubscriptions() : createTopic();
             })
             .catch(err => {
-                console.error('ERROR while checking topics:', err);
+                console.error('ERROR while retrieving topics:', err);
             });
     }
 
 // Checks subscriptions for the subscriber given
     function checkSubscriptions() {
+        let existingSubscriber = false;
         pubsub
             .getSubscriptions()
             .then(results => {
@@ -109,21 +105,17 @@ router.get('/', function(req, res, next) {
 
                     subscriptions.forEach(resultSubscription => {
 
-//                      If subscription exists then the flag is set to true
+//                      If subscription exists then set flag to true
                         if (resultSubscription.name.indexOf(subscriber) > -1) {
                             existingSubscriber = true;
                         }
                     });
-//                  If there are existing subscriptions, listen for new messages. If none exist, create one
-                    if (!existingSubscriber) {
-                        createSubscription();
-                    } else {
-                        onSubscription();
-                    }
+                    // Creates a new subscriber if one doesn't exist or listens for new messages
+                    existingSubscriber ? onSubscription() : createSubscription();
                 }
             )
             .catch(err => {
-                console.error('GET SUBSCRIPTIONS ERROR:', err);
+                console.error('Error while retrieving subscriptions:', err);
             });
     }
 
@@ -135,12 +127,11 @@ router.get('/', function(req, res, next) {
             .then(results => {
                 const topicResult = results[0];
                 console.log(`Topic ${topicResult} created.`);
-
-//              Once the topic is created, check for subscriptions
+//              Once the topic is created, create a subscription to pair with it
                 checkSubscriptions();
             })
             .catch(err => {
-                console.error('ERROR while creating topic:', err);
+                console.error('ERROR while creating topic ' + topic + ': ', err);
             });
     }
 
@@ -156,7 +147,7 @@ router.get('/', function(req, res, next) {
                 onSubscription();
             })
             .catch(err => {
-                console.error('ERROR while creating subscription:', err);
+                console.error('ERROR while creating subscription ' + subscriber + ': ', err);
             });
     }
 
@@ -181,7 +172,7 @@ router.get('/', function(req, res, next) {
                 console.log(`Saved ${task.key.name}: ${task.data}`);
             })
             .catch(err => {
-                console.error('ERROR:', err);
+                console.error('Error while upserting into Datastore: ', err);
             });
     }
 
@@ -192,12 +183,8 @@ router.get('/', function(req, res, next) {
                 console.log(`Saved ${task.key.name}: ${task.data}`);
             })
             .catch(err => {
-                console.error('ERROR:', err);
+                console.error('Error while inserting into Datastore: ', err);
             });
-
-        // Acknowledge receipt of the message
-        message.ack();
-
     }
 
 });
